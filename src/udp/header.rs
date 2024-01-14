@@ -1,14 +1,15 @@
 use deku::{DekuContainerWrite, DekuEnumExt, DekuError, DekuRead, DekuUpdate, DekuWrite};
 use derivative::Derivative;
 
-#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
+#[derive(Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
 #[derivative(Default(new = "true"))]
+#[derivative(Debug)]
 pub struct Header {
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "1234"))]
     id: u16,
 
-    qr_indicator: QRIndicator,
+    pub qr_indicator: QRIndicator,
 
     #[deku(bits = "4")]
     #[derivative(Default(value = "0"))]
@@ -32,23 +33,23 @@ pub struct Header {
     #[derivative(Default(value = "0"))]
     reserved: u8,
 
-    #[deku(bits = "4")]
+    #[deku(bits = "4", pad_bits_after = "1")]
     #[derivative(Default(value = "0"))]
     response_code: u8,
 
-    #[deku(bytes = "2")]
+    #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
-    question_count: u16,
+    pub question_count: u16,
 
-    #[deku(bytes = "2")]
+    #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
     answer_record_count: u16,
 
-    #[deku(bytes = "2")]
+    #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
     authority_record_count: u16,
 
-    #[deku(bytes = "2")]
+    #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
     additional_record_count: u16,
 }
@@ -58,16 +59,20 @@ pub struct Header {
 #[derive(Derivative)]
 #[derivative(Default)]
 pub enum QRIndicator {
+    #[deku(id = "0x00")]
+    Query,
+
     #[deku(id = "0x01")]
     #[derivative(Default)]
-    Reply,
-    #[deku(id = "0x00")]
-    Question,
+    Response,
 }
 
 #[cfg(test)]
 mod test {
-    use deku::bitvec::{bits, Lsb0};
+    use deku::{
+        bitvec::{bits, Lsb0},
+        DekuContainerRead,
+    };
     use std::error::Error;
 
     use super::*;
@@ -86,9 +91,18 @@ mod test {
                 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ]
         );
+
+        let header_from_bytes = Header::from_bytes((header_bytes.as_ref(), 0))?.1;
+        assert_eq!(header, header_from_bytes);
+
+        let mut header_from = Header::try_from(header_bytes.as_ref())?;
+        assert_eq!(header, header_from);
+
+        header_from.question_count = 1;
+        dbg!(header_from.to_bytes()?);
         Ok(())
     }
 }
