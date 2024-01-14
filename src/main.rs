@@ -4,7 +4,7 @@ use std::{error::Error, net::UdpSocket};
 
 use deku::DekuContainerWrite;
 
-use crate::udp::Header;
+use crate::udp::{Dns, QRIndicator};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
@@ -13,8 +13,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         match udp_socket.recv_from(&mut buf) {
             Ok((size, source)) => {
-                println!("Received {} bytes from {}", size, source);
-                let response = Header::new().to_bytes()?;
+                let mut dns = Dns::try_from(&buf[..size])?;
+
+                dns.header.question_count = 1;
+                dns.header.qr_indicator = QRIndicator::Response;
+
+                let response = dns.to_bytes()?;
                 udp_socket.send_to(&response, source)?;
             }
             Err(e) => {
