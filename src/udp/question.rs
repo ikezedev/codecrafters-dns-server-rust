@@ -1,13 +1,19 @@
 use deku::{DekuContainerWrite, DekuRead, DekuUpdate, DekuWrite};
+use derivative::Derivative;
 
 use super::name::Name;
 
-#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
+#[derivative(Default)]
 pub struct Question {
     domain_name: Name,
+
     #[deku(bytes = "2", endian = "big")]
+    #[derivative(Default(value = "1"))]
     q_type: u16,
+
     #[deku(bytes = "2", endian = "big")]
+    #[derivative(Default(value = "1"))]
     class: u16,
 }
 

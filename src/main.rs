@@ -12,11 +12,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         match udp_socket.recv_from(&mut buf) {
-            Ok((size, source)) => {
-                let mut dns = Dns::try_from(&buf[..size])?;
+            Ok((_size, source)) => {
+                // let mut dns = Dns::try_from(&buf[..size])?;
+                let mut dns = Dns::default();
 
                 dns.header.question_count = 1;
                 dns.header.qr_indicator = QRIndicator::Response;
+                dns.header.answer_record_count = 1;
 
                 let response = dns.to_bytes()?;
                 udp_socket.send_to(&response, source)?;

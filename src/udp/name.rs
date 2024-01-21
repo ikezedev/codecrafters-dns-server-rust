@@ -12,6 +12,12 @@ pub struct Name {
     string: String,
 }
 
+impl Default for Name {
+    fn default() -> Self {
+        Self::new("codecrafters.io")
+    }
+}
+
 impl Name {
     fn read(rest: &BitSlice<u8, Msb0>) -> Result<(&BitSlice<u8, Msb0>, String), DekuError> {
         let mut acc: Vec<String> = Vec::new();

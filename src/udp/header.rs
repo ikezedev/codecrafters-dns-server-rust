@@ -43,7 +43,7 @@ pub struct Header {
 
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
-    answer_record_count: u16,
+    pub answer_record_count: u16,
 
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
