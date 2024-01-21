@@ -6,7 +6,7 @@ use super::name::Name;
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
 #[derivative(Default)]
 pub struct Question {
-    domain_name: Name,
+    pub domain_name: Name,
 
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "1"))]

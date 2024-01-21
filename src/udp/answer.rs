@@ -6,7 +6,7 @@ use super::name::Name;
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
 #[derivative(Default)]
 pub struct Answer {
-    name: Name,
+    pub name: Name,
     r#type: AnswerType,
     class: AnswerClass,
 
