@@ -7,13 +7,13 @@ use derivative::Derivative;
 pub struct Header {
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "1234"))]
-    id: u16,
+    pub id: u16,
 
     pub qr_indicator: QRIndicator,
 
     #[deku(bits = "4")]
     #[derivative(Default(value = "0"))]
-    op_code: u8,
+    pub op_code: u8,
 
     #[deku(bits = "1")]
     #[derivative(Default(value = "false"))]
@@ -26,16 +26,19 @@ pub struct Header {
 
     #[deku(bits = "1")]
     #[derivative(Default(value = "false"))]
-    /// always 0 for udp
+    pub recursion_desired: bool,
+
+    #[deku(bits = "1")]
+    #[derivative(Default(value = "false"))]
     recursion_available: bool,
 
     #[deku(bits = "3")]
     #[derivative(Default(value = "0"))]
     reserved: u8,
 
-    #[deku(bits = "4", pad_bits_after = "1")]
+    #[deku(bits = "4")]
     #[derivative(Default(value = "0"))]
-    response_code: u8,
+    pub response_code: u8,
 
     #[deku(bytes = "2", endian = "big")]
     #[derivative(Default(value = "0"))]
@@ -102,7 +105,6 @@ mod test {
         assert_eq!(header, header_from);
 
         header_from.question_count = 1;
-        dbg!(header_from.to_bytes()?);
         Ok(())
     }
 }
