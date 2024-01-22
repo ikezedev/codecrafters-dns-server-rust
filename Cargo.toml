@@ -19,10 +19,11 @@ edition = "2021"
 #
 # DON'T EDIT THIS!
 [dependencies]
-anyhow = "1.0.68"          # error handling
-bytes = "1.3.0"            # helps manage buffers
-thiserror = "1.0.38"       # error handling
-nom = "7.1.3"              # parsing
-rand = "0.8.5"             # randomness
+anyhow = "1.0.68"    # error handling
+bytes = "1.3.0"      # helps manage buffers
+thiserror = "1.0.38" # error handling
+nom = "7.1.3"        # parsing
+rand = "0.8.5"       # randomness
 deku = "0.16.0"
 derivative = "2.2.0"
+pretty_assertions = "1.4.0"
