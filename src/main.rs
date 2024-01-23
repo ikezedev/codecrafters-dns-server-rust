@@ -3,9 +3,7 @@ mod udp;
 use std::{error::Error, net::UdpSocket};
 
 use deku::{DekuContainerRead, DekuContainerWrite};
-use udp::DnsQuery;
-
-use crate::udp::DnsResponse;
+use udp::{DnsQuery, ResolveWithBuffer};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
@@ -15,7 +13,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         match udp_socket.recv_from(&mut buf) {
             Ok((_size, source)) => {
                 let query = DnsQuery::from_bytes((&buf, 0))?.1;
-                let response = DnsResponse::from(query);
+                let response = query.resolve(&buf)?;
+                let response = response.to_expected();
 
                 let response = response.to_bytes()?;
                 udp_socket.send_to(&response, source)?;
