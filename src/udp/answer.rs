@@ -23,6 +23,15 @@ pub struct Answer {
     data: Vec<u8>,
 }
 
+impl Answer {
+    pub fn new(name: Name) -> Self {
+        Self {
+            name,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
 #[deku(type = "u16", endian = "big")]
 #[derive(Derivative)]
