@@ -3,22 +3,26 @@ mod header;
 mod name;
 mod question;
 
-use core::fmt;
-
-use deku::bitvec::{BitSlice, BitVec, Msb0};
-use deku::{DekuContainerRead, DekuContainerWrite, DekuError, DekuRead, DekuUpdate, DekuWrite};
+use crate::traits::{ReadUntill, WriteAll};
+use deku::{DekuContainerWrite, DekuError, DekuRead, DekuUpdate, DekuWrite};
 
 use self::answer::Answer;
 pub use self::header::{Header, QRIndicator};
 pub use self::question::Question;
 use self::question::QuestionQuery;
 
-#[derive(Debug, Clone, PartialEq, DekuWrite, Default)]
+#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Default)]
 pub struct DnsResponse {
     pub header: Header,
-    #[deku(writer = "Question::write_all(deku::output, &self.questions)")]
+    #[deku(
+        writer = "Question::write_all(deku::output, &self.questions)",
+        reader = "Question::read_count(deku::rest, header.question_count)"
+    )]
     pub questions: Vec<Question>,
-    #[deku(writer = "Answer::write_all(deku::output, &self.answers)")]
+    #[deku(
+        writer = "Answer::write_all(deku::output, &self.answers)",
+        reader = "Answer::read_count(deku::rest, header.answer_record_count)"
+    )]
     pub answers: Vec<Answer>,
 }
 
@@ -29,7 +33,7 @@ pub struct DnsQuery {
     pub questions: Vec<QuestionQuery>,
 }
 
-impl ResolveWithBuffer<DnsResponse> for DnsQuery {
+impl ResolveWithBuffer<DnsResponse> for DnsResponse {
     fn resolve(self, buf: &[u8]) -> Result<DnsResponse, DekuError> {
         let questions = self.questions.resolve(buf)?;
         let answers: Vec<_> = questions
@@ -48,61 +52,6 @@ impl ResolveWithBuffer<DnsResponse> for DnsQuery {
         })
     }
 }
-
-pub trait ReadUntill<'a>: DekuRead<'a> + DekuContainerRead<'a> {
-    fn read_till_end(
-        rest: &'a BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, Vec<Self>), DekuError>
-    where
-        Self: Sized + fmt::Debug,
-    {
-        let mut res = Vec::<Self>::new();
-        let mut next = rest;
-
-        loop {
-            if next.is_empty() {
-                return Ok((next, res));
-            }
-            let (input, val) = Self::read(next, ())?;
-            res.push(val);
-            next = input;
-        }
-    }
-
-    fn read_until_null(
-        rest: &'a BitSlice<u8, Msb0>,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Vec<Self>), DekuError>
-    where
-        Self: Sized + fmt::Debug,
-    {
-        let mut res = Vec::<Self>::new();
-        let mut next = rest;
-
-        loop {
-            if next.is_empty() || u8::read(next, ())?.1 == 0 {
-                return Ok((next, res));
-            }
-            let (input, val) = Self::read(next, ())?;
-            res.push(val);
-            next = input;
-        }
-    }
-}
-
-pub trait WriteAll: DekuWrite + DekuContainerWrite {
-    fn write_all(output: &mut BitVec<u8, Msb0>, entries: &[Self]) -> Result<(), DekuError>
-    where
-        Self: Sized,
-    {
-        for entry in entries {
-            entry.to_bytes()?.write(output, ())?;
-        }
-        Ok(())
-    }
-}
-
-impl<'a, T> ReadUntill<'a> for T where T: DekuRead<'a> + DekuContainerRead<'a> {}
-impl<T> WriteAll for T where T: DekuWrite + DekuContainerWrite {}
 
 pub trait ResolveWithBuffer<T> {
     fn resolve(self, buf: &[u8]) -> Result<T, DekuError>;
@@ -131,15 +80,17 @@ impl DnsResponse {
 #[cfg(test)]
 mod test {
     use super::*;
-    use deku::DekuContainerWrite;
+    use deku::{DekuContainerRead, DekuContainerWrite};
     use pretty_assertions::assert_eq;
     use std::error::Error;
 
     #[test]
     fn test_dns_bytes() -> Result<(), Box<dyn Error>> {
-        let header = Header::new();
+        let mut header = Header::new();
         let question = Question::new("google.com", 1);
         let answer = Answer::default();
+        header.answer_record_count = 1;
+        header.question_count = 1;
 
         let header_bytes = header.to_bytes()?;
         let question_bytes = question.to_bytes()?;
@@ -151,13 +102,21 @@ mod test {
             answers: vec![answer],
         };
         let dns_bytes = dns.to_bytes()?;
+        let input = [
+            header_bytes.clone(),
+            question_bytes.clone(),
+            answer_bytes.clone(),
+        ]
+        .concat();
+        let dns_query = DnsResponse::from_bytes((&input, 0))?;
 
-        let dns_query = DnsQuery::try_from(
-            [header_bytes.clone(), question_bytes.clone()]
-                .concat()
-                .as_ref(),
-        )?;
-        let resolved = dns_query.resolve(&[])?;
+        assert_eq!(
+            dns_bytes,
+            [header_bytes, question_bytes, answer_bytes].concat()
+        );
+
+        let resolved = dns_query.1.resolve(&[])?;
+
         assert_eq!(
             dns,
             DnsResponse {
@@ -166,10 +125,6 @@ mod test {
             }
         );
 
-        assert_eq!(
-            dns_bytes,
-            [header_bytes, question_bytes, answer_bytes].concat()
-        );
         Ok(())
     }
 }

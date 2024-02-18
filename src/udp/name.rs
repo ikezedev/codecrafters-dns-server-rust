@@ -3,7 +3,7 @@ use std::io::Read;
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::prelude::*;
 
-use super::ResolveWithBuffer;
+use super::{ReadUntill, ResolveWithBuffer, WriteAll};
 
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
 pub struct Name {
@@ -67,12 +67,22 @@ impl NameRead {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Label(String);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
 pub struct Pointer(u8);
 
 impl ResolveWithBuffer<Name> for Pointer {
     fn resolve(self, buf: &[u8]) -> Result<Name, DekuError> {
         Ok(Name::from_bytes((buf, (self.0 * 8).into()))?.1)
+    }
+}
+
+impl ResolveWithBuffer<Name2> for Name2 {
+    fn resolve(self, buf: &[u8]) -> Result<Name2, DekuError> {
+        if let Some(NameKind::Pointer(start)) = self.entries.last() {
+            Ok(Name2::from_bytes((buf, (start * 8).into()))?.1)
+        } else {
+            Ok(self)
+        }
     }
 }
 
@@ -107,6 +117,50 @@ pub enum NameEntry {
     Pointer(Pointer),
     Labels(Vec<Label>),
     Combined { start: Vec<Label>, end: Pointer },
+}
+
+#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u8", bits = "2")]
+pub enum NameKind {
+    #[deku(id = "0b00")]
+    Label {
+        #[deku(bits = "6")]
+        count: u8,
+        #[deku(count = "count")]
+        data: Vec<u8>,
+    },
+
+    #[deku(id = "0b11")]
+    Pointer(#[deku(pad_bits_before = "6")] u8),
+}
+
+#[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite)]
+pub struct Name2 {
+    #[deku(
+        reader = "NameKind::read_until_null(deku::rest)",
+        writer = "NameKind::write_all_with_null(deku::output, &self.entries)"
+    )]
+    entries: Vec<NameKind>,
+}
+
+impl Name2 {
+    pub fn new(name: &str) -> Self {
+        Self {
+            entries: name
+                .split(".")
+                .map(|label| NameKind::Label {
+                    count: label.len() as u8,
+                    data: label.into(),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl Default for Name2 {
+    fn default() -> Self {
+        Self::new("codecrafters.io")
+    }
 }
 
 impl Default for Name {
@@ -181,7 +235,7 @@ mod test {
 
     #[test]
     fn write() -> Result<(), Box<dyn Error>> {
-        let name = Name::new("google.com");
+        let name = Name2::new("google.com");
         let name_bytes = name.to_bytes()?;
         assert_eq!(
             name_bytes,
@@ -195,14 +249,11 @@ mod test {
         let bytes = &[
             0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 00,
         ];
-        let name = Name::from_bytes((bytes, 0))?.1;
-        assert_eq!(name, Name::new("google.com"));
+        let (_, name) = Name2::from_bytes((bytes, 0))?;
+        assert_eq!(name, Name2::new("google.com"));
 
-        let name = Name::try_from(bytes.as_ref())?;
-        assert_eq!(name, Name::new("google.com"));
-
-        let name3 = NameRead::try_from(bytes.as_ref())?;
-        dbg!(name3);
+        let name = Name2::try_from(bytes.as_ref())?;
+        assert_eq!(name, Name2::new("google.com"));
         Ok(())
     }
 }

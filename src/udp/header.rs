@@ -21,7 +21,6 @@ pub struct Header {
 
     #[deku(bits = "1")]
     #[derivative(Default(value = "false"))]
-    /// always 0 for udp
     truncation: bool,
 
     #[deku(bits = "1")]
