@@ -5,7 +5,7 @@ use deku::{
     DekuContainerRead, DekuContainerWrite, DekuError, DekuRead, DekuWrite,
 };
 
-type DekuRes<'a, T> = Result<(&'a BitSlice<u8, Msb0>, Vec<T>), DekuError>;
+pub type DekuRes<'a, T> = Result<(&'a BitSlice<u8, Msb0>, Vec<T>), DekuError>;
 
 pub trait ReadUntill<'a>: DekuRead<'a> + DekuContainerRead<'a> {
     fn read_until_null(rest: &'a BitSlice<u8, Msb0>) -> DekuRes<Self>

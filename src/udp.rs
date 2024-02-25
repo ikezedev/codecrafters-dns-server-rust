@@ -9,10 +9,9 @@ use deku::{DekuContainerWrite, DekuError, DekuRead, DekuUpdate, DekuWrite};
 use self::answer::Answer;
 pub use self::header::{Header, QRIndicator};
 pub use self::question::Question;
-use self::question::QuestionQuery;
 
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Default)]
-pub struct DnsResponse {
+pub struct Dns {
     pub header: Header,
     #[deku(
         writer = "Question::write_all(deku::output, &self.questions)",
@@ -26,52 +25,37 @@ pub struct DnsResponse {
     pub answers: Vec<Answer>,
 }
 
-#[derive(Debug, Clone, PartialEq, DekuRead, Default)]
-pub struct DnsQuery {
-    pub header: Header,
-    #[deku(reader = "QuestionQuery::read_until_null(deku::rest)")]
-    pub questions: Vec<QuestionQuery>,
-}
-
-impl ResolveWithBuffer<DnsResponse> for DnsResponse {
-    fn resolve(self, buf: &[u8]) -> Result<DnsResponse, DekuError> {
+impl ResolveWithBuffer for Dns {
+    fn resolve(self, buf: &[u8]) -> Result<Dns, DekuError> {
         let questions = self.questions.resolve(buf)?;
-        let answers: Vec<_> = questions
-            .iter()
-            .map(|q| Answer::new(q.domain_name.clone()))
-            .collect();
 
-        let mut header = self.header;
-        header.question_count = questions.len() as u16;
-        header.answer_record_count = answers.len() as u16;
-
-        Ok(DnsResponse {
-            header,
-            questions,
-            answers,
-        })
+        Ok(Dns { questions, ..self })
     }
 }
 
-pub trait ResolveWithBuffer<T> {
-    fn resolve(self, buf: &[u8]) -> Result<T, DekuError>;
+pub trait ResolveWithBuffer {
+    fn resolve(self, buf: &[u8]) -> Result<Self, DekuError>
+    where
+        Self: Sized;
 }
 
-impl<T, U> ResolveWithBuffer<Vec<U>> for Vec<T>
+impl<T> ResolveWithBuffer for Vec<T>
 where
-    T: ResolveWithBuffer<U>,
+    T: ResolveWithBuffer,
 {
-    fn resolve(self, buf: &[u8]) -> Result<Vec<U>, DekuError> {
+    fn resolve(self, buf: &[u8]) -> Result<Vec<T>, DekuError> {
         self.into_iter()
             .map(|item| item.resolve(buf))
             .collect::<Result<Vec<_>, _>>()
     }
 }
 
-impl DnsResponse {
+impl Dns {
     pub fn to_expected(mut self) -> Self {
         self.header.response_code = if self.header.op_code == 0 { 0 } else { 4 };
         self.header.qr_indicator = QRIndicator::Response;
+        self.header.question_count = self.questions.len() as u16;
+        self.header.answer_record_count = self.answers.len() as u16;
 
         self
     }
@@ -96,7 +80,7 @@ mod test {
         let question_bytes = question.to_bytes()?;
         let answer_bytes = answer.to_bytes()?;
 
-        let dns = DnsResponse {
+        let dns = Dns {
             header,
             questions: vec![question],
             answers: vec![answer],
@@ -108,7 +92,7 @@ mod test {
             answer_bytes.clone(),
         ]
         .concat();
-        let dns_query = DnsResponse::from_bytes((&input, 0))?;
+        let dns_query = Dns::from_bytes((&input, 0))?;
 
         assert_eq!(
             dns_bytes,
@@ -119,7 +103,7 @@ mod test {
 
         assert_eq!(
             dns,
-            DnsResponse {
+            Dns {
                 answers: vec![Answer::default()],
                 ..resolved
             }

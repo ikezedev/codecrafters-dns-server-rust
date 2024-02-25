@@ -1,12 +1,12 @@
 use deku::{DekuContainerWrite, DekuEnumExt, DekuError, DekuRead, DekuUpdate, DekuWrite};
 use derivative::Derivative;
 
-use super::name::Name2;
+use super::name::Name;
 
 #[derive(Debug, Clone, PartialEq, DekuRead, DekuWrite, Derivative)]
 #[derivative(Default)]
 pub struct Answer {
-    pub name: Name2,
+    pub name: Name,
     r#type: AnswerType,
     class: AnswerClass,
 
@@ -24,7 +24,7 @@ pub struct Answer {
 }
 
 impl Answer {
-    pub fn new(name: Name2) -> Self {
+    pub fn new(name: Name) -> Self {
         Self {
             name,
             ..Default::default()
